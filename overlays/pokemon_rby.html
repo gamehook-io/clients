@@ -1,0 +1,187 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Pokemon R/B/Y Overlay</title>
+    <link href="style.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+    <div id="app" v-cloak>
+        <div class="p-2" v-if="ready == false">
+            Connecting to GameHook...
+        </div>
+        <div class="d-flex justify-content-between h-100" v-else>
+            <!-- Left Sidebar -->
+            <div class="d-flex flex-column align-items-center justify-content-center" style="width: 19rem; margin-left: 1rem;">
+                <div v-for="pokemon in team" class="widget border d-flex flex-column" style="height: 9.5rem;">
+                    <div class="d-flex h-100">
+                        <div class="d-flex flex-column" style="width: 60%;" :style="bgPokemonStyle(pokemon)">
+                            <div class="flex-grow-1 text-center">
+                                {{ pokemon.name }}
+                            </div>
+                            <div class="smaller">Lv {{ pokemon.level}}</div>
+                            <div class="smaller">HP: {{ pokemon.hp }} / {{ pokemon.maxHp }}</div>
+                        </div>
+
+                        <div class="d-flex flex-column justify-content-around text-center" style="width: 40%;">
+                            <div>{{ pokemon.move1.value ?? "-" }}</div>
+                            <div>{{ pokemon.move2.value ?? "-" }}</div>
+                            <div>{{ pokemon.move3.value ?? "-" }}</div>
+                            <div>{{ pokemon.move4.value ?? '-' }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <!-- Center -- where content will go -->
+                &nbsp;
+            </div>
+
+            <!-- Right Sidebar -->
+            <div class="d-flex flex-column align-items-center justify-content-center" style="width: 19rem; margin-right: 1rem;">
+                <div class="widget border d-flex flex-column" style="height: 9.5rem;">
+                    <div class="d-flex h-100" v-if="enemyPokemon">
+                        <div class="d-flex flex-column" style="width: 60%;" :style="bgPokemonStyle(enemyPokemon)">
+                            <div class="flex-grow-1 text-center">
+                                <span v-if="mapper.properties.battle.type.value === 'Wild'">WILD</span>
+                                <span v-else>{{ mapper.properties.battle.trainer.class }}'s</span> {{ enemyPokemon.species.value.name }}
+                            </div>
+                            <div class="smaller">Lv {{ enemyPokemon.level}}</div>
+                            <div class="smaller">HP: {{ enemyPokemon.hp }} / {{ enemyPokemon.maxHp }}</div>
+                        </div>
+
+                        <div class="d-flex flex-column justify-content-around text-center" style="width: 40%;">
+                            <div>{{ enemyPokemon.move1.value ?? "-" }}</div>
+                            <div>{{ enemyPokemon.move2.value ?? "-" }}</div>
+                            <div>{{ enemyPokemon.move3.value ?? "-" }}</div>
+                            <div>{{ enemyPokemon.move4.value ?? '-' }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="widget border" style="width: 19rem;">
+                    <div class="widget-title p-1">Wild Encounters</div>
+
+                    <div class="d-flex justify-content-around p-2">
+                        <template v-for="x in distinctWildPokemon">
+                        <img :class="{'grayscale': mapper.properties.player.pokedexCaught.value[x.pokedexNumber - 1] != true}" :src="getPokemonSpriteImage(x)" />
+                    </template>
+                    </div>
+                </div>
+
+                <div class="widget border" style="width: 19rem;">
+                    <div class="widget-title p-1">Badges</div>
+
+                    <div class="py-2">
+                        <div class="d-flex justify-content-around flex-wrap p-2">
+                            <img :class="{'grayscale': badges.boulderBadge.value == false}" src='https://archives.bulbagarden.net/media/upload/thumb/d/dd/Boulder_Badge.png/50px-Boulder_Badge.png' />
+                            <img :class="{'grayscale': badges.cascadeBadge.value == false}" src='https://archives.bulbagarden.net/media/upload/thumb/9/9c/Cascade_Badge.png/50px-Cascade_Badge.png' />
+                            <img :class="{'grayscale': badges.thunderBadge.value == false}" src='https://archives.bulbagarden.net/media/upload/thumb/a/a6/Thunder_Badge.png/50px-Thunder_Badge.png' />
+                            <img :class="{'grayscale': badges.rainbowBadge.value == false}" src='https://archives.bulbagarden.net/media/upload/thumb/b/b5/Rainbow_Badge.png/50px-Rainbow_Badge.png' />
+                        </div>
+
+                        <div class="d-flex justify-content-around flex-wrap p-2">
+                            <img :class="{'grayscale': badges.soulBadge.value == false}" src='https://archives.bulbagarden.net/media/upload/thumb/7/7d/Soul_Badge.png/50px-Soul_Badge.png' />
+                            <img :class="{'grayscale': badges.marshBadge.value == false}" src='https://archives.bulbagarden.net/media/upload/thumb/6/6b/Marsh_Badge.png/50px-Marsh_Badge.png' />
+                            <img :class="{'grayscale': badges.volcanoBadge.value == false}" src='https://archives.bulbagarden.net/media/upload/thumb/1/12/Volcano_Badge.png/50px-Volcano_Badge.png' />
+                            <img :class="{'grayscale': badges.earthBadge.value == false}" src='https://archives.bulbagarden.net/media/upload/thumb/7/78/Earth_Badge.png/50px-Earth_Badge.png' />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="widget border d-flex flex-column flex-grow-1" style="width: 19rem;">
+                    <div class="widget-title">Chat</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/vue@3"></script>
+    <script src="https://unpkg.com/@microsoft/signalr@latest/dist/browser/signalr.min.js"></script>
+    <script src="http://localhost:8085/dist/gameHookMapperClient.js"></script>
+
+    <script type="text/javascript">
+        const mapper = new GameHookMapperClient()
+
+        const zeroPad = (num, places) => String(num).padStart(places, '0')
+
+        Vue.createApp({
+            data() {
+                return {
+                    ready: false,
+                    mapper: mapper
+                }
+            },
+            computed: {
+                props: function() {
+                    return this.mapper.properties
+                },
+                enemyPokemon: function() {
+                    if (this.mapper.properties.battle.type.value && this.mapper.properties.battle.enemyPokemon.species.value != null) {
+                        return this.mapper.properties.battle.enemyPokemon
+                    }
+
+                    return null
+                },
+                wildPokemon: function() {
+                    return [].concat.apply([], [
+                        this.mapper.properties.overworld.encounters.common,
+                        this.mapper.properties.overworld.encounters.uncommon,
+                        this.mapper.properties.overworld.encounters.rare,
+                    ]);
+                },
+                distinctWildPokemon: function() {
+                    const wildPokemon = [].concat.apply([], [
+                        this.mapper.properties.overworld.encounters.common.map(x => x.pokemon.value),
+                        this.mapper.properties.overworld.encounters.uncommon.map(x => x.pokemon.value),
+                        this.mapper.properties.overworld.encounters.rare.map(x => x.pokemon.value),
+                    ])
+
+                    return [...new Map(wildPokemon.map(item => [item['name'], item])).values()]
+                },
+                team: function() {
+                    return this.mapper.properties.player.team.filter(x => x.species.value)
+                },
+                badges: function() {
+                    return this.mapper.properties.player.badges
+                }
+            },
+            methods: {
+                getPokemonMainImage: function(pokemon) {
+                    return `https://www.pokencyclopedia.info/sprites/artworks/art-hd_anime/art-hd_anime_${zeroPad(pokemon.species.value.pokedexNumber, 3)}.png`
+                },
+                getPokemonSpriteImage: function(pokemon) {
+                    return `https://www.pokencyclopedia.info/sprites/spin-off/sprf_md-ex/sprf_mdex_${zeroPad(pokemon.pokedexNumber, 3)}.png`
+                },
+                bgPokemonStyle: function(pokemon) {
+                    return {
+                        'background-image': `url(${this.getPokemonMainImage(pokemon)})`,
+                        'background-size': 'contain',
+                        'background-repeat': 'no-repeat',
+                        'background-position': 'center',
+                        'mix-blend-mode': 'multiply',
+                        'grayscale': pokemon.hp == 0
+                    }
+                }
+            },
+            mounted: async function() {
+                this.mapper.onConnected = () => {
+                    this.ready = true
+                }
+                this.mapper.onDisconnected = () => {
+                    this.ready = false
+                }
+
+                await this.mapper.connect()
+            }
+        }).mount('#app')
+    </script>
+</body>
+
+</html>
